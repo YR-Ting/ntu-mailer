@@ -16,7 +16,7 @@ from mailer.config import (
     NTU_SMTP_PORT,
 )
 from mailer.recipients import load_recipients
-from mailer.sender import send_batch, send_one
+from mailer.sender import BatchConnectionError, send_batch, send_one
 from mailer.template import render_content
 
 load_dotenv()  # 本機執行時讀取同目錄下的 .env 檔案（若有的話）
@@ -218,7 +218,11 @@ if st.button("🧪 寄送測試信"):
         if result.success:
             st.success(f"測試信已寄出至 {test_email}")
         else:
-            st.error(f"寄送失敗：{result.error}")
+            st.error(
+                f"寄送失敗：{result.error}\n\n"
+                "常見原因：帳號密碼錯誤（Gmail 請確認是否用「應用程式密碼」而非一般登入密碼）、"
+                "或台大信箱需連上校內網路／VPN。"
+            )
 
 
 # ---------- 5. 正式批次寄送 ----------
@@ -245,15 +249,23 @@ if st.button("🚀 正式寄送", disabled=not confirm):
                 else:
                     st.write(f"❌ {result.email} — {result.error}")
 
-        with st.spinner("批次寄送中，請勿關閉視窗..."):
-            results = send_batch(
-                account=account,
-                recipients_df=recipients_df,
-                subject=subject,
-                html_template=html_content,
-                attachments=uploaded_attachments,
-                progress_callback=on_progress,
+        try:
+            with st.spinner("批次寄送中，請勿關閉視窗..."):
+                results = send_batch(
+                    account=account,
+                    recipients_df=recipients_df,
+                    subject=subject,
+                    html_template=html_content,
+                    attachments=uploaded_attachments,
+                    progress_callback=on_progress,
+                )
+        except BatchConnectionError as e:
+            st.error(
+                f"❌ {e}\n\n"
+                "常見原因：帳號密碼錯誤（Gmail 請確認是否用「應用程式密碼」而非一般登入密碼）、"
+                "或台大信箱需連上校內網路／VPN。"
             )
+            st.stop()
 
         success_count = sum(1 for r in results if r.success)
         fail_count = len(results) - success_count

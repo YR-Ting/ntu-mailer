@@ -123,6 +123,10 @@ def send_one(
                 pass
 
 
+class BatchConnectionError(Exception):
+    """批次寄送時，連線或登入伺服器失敗（尚未開始寄任何一封信）。"""
+
+
 def send_batch(
     account: EmailAccount,
     recipients_df,
@@ -135,11 +139,21 @@ def send_batch(
     批次寄送。共用同一條 SMTP 連線以加快速度。
     progress_callback(index, total, result)：每寄完一封就會呼叫一次，方便介面更新進度條。
     回傳的每個 SendResult 都帶有完整信件內容（raw_message），供輸出備份使用。
+
+    若連線或登入失敗（帳密錯誤、連不上伺服器等），會拋出 BatchConnectionError，
+    帶有清楚的錯誤訊息，交由呼叫端（app.py）用 st.error 顯示，而不是讓整個頁面崩潰。
     """
     results: list[SendResult] = []
     total = len(recipients_df)
 
-    with _connect(account) as smtp_conn:
+    try:
+        smtp_conn = _connect(account)
+    except Exception as e:
+        raise BatchConnectionError(
+            f"連線或登入寄件伺服器失敗，尚未寄出任何信件。原始錯誤：{e}"
+        ) from e
+
+    with smtp_conn:
         for i, row in recipients_df.iterrows():
             row_dict = row.to_dict()
             personalized_html = render_content(html_template, row_dict)
