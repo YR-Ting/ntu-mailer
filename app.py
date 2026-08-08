@@ -56,8 +56,8 @@ if use_gmail:
 else:
     st.caption("台大信箱登入帳號為學號本身，不需加上 @ntu.edu.tw。")
     st.warning(
-        "⚠️ 台大信箱寄信伺服器僅允許校內網路連線。若你不在校園網路，"
-        "請先連上台大 VPN（[vpn.ntu.edu.tw](https://vpn.ntu.edu.tw)）再寄信，"
+        "台大信箱寄信伺服器僅允許校內網路連線。若你不在校園網路，"
+        "請先連上台大 VPN 或校內網路（ntu_peap, eduroam）再寄信，"
         "否則會出現連線逾時的錯誤。"
     )
     default_host, default_port = NTU_SMTP_HOST, NTU_SMTP_PORT

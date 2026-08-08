@@ -1,11 +1,11 @@
 """
 讀取與驗證收件人 CSV 清單。
-CSV 欄位：name, email 為必填；cc, bcc 為選填（多筆用空格分隔）。
+CSV 欄位：email 為必填；name, cc, bcc 為選填（cc/bcc 多筆用空格分隔）。
 其餘任意欄位都可以在 content.html 內用 $欄位名 替換。
 """
 import pandas as pd
 
-REQUIRED_COLUMNS = ["name", "email"]
+REQUIRED_COLUMNS = ["email"]
 RESERVED_COLUMNS = ["email", "cc", "bcc"]  # 不可用於內文變數替換
 
 NTU_DOMAIN = "ntu.edu.tw"
@@ -40,7 +40,7 @@ def load_recipients(csv_file, use_ntu_shorthand: bool = True) -> pd.DataFrame:
     use_ntu_shorthand: 若為 True，email/cc/bcc 欄位中只填學號（不含 @）的值，
                         會自動補上 @ntu.edu.tw。使用 Gmail 寄送時通常應設為 False，
                         因為收件人不一定是台大信箱。
-    回傳：整理好的 DataFrame，並保證含有 cc / bcc 欄位（缺的話補空字串）
+    回傳：整理好的 DataFrame，並保證含有 name / cc / bcc 欄位（缺的話補空字串）
     """
     df = pd.read_csv(csv_file, dtype=str).fillna("")
 
@@ -48,7 +48,7 @@ def load_recipients(csv_file, use_ntu_shorthand: bool = True) -> pd.DataFrame:
     if missing:
         raise ValueError(f"CSV 缺少必要欄位：{', '.join(missing)}")
 
-    for col in ("cc", "bcc"):
+    for col in ("name", "cc", "bcc"):
         if col not in df.columns:
             df[col] = ""
 
