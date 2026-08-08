@@ -107,7 +107,7 @@ col_upload, col_sample = st.columns([3, 1])
 with col_upload:
     csv_file = st.file_uploader("上傳收件人 CSV", type=["csv"])
     st.caption(
-        "CSV 需包含 name、email 欄位；cc、bcc 為選填（同一列多筆信箱請用空格分隔）。"
+        "CSV 需包含 email 欄位（必填）；name、cc、bcc 為選填（cc/bcc 多筆信箱請用空格分隔）。"
         "其餘欄位可在內文中用 $欄位名 替換，例如 $name。"
         + ("" if use_gmail else " **若收件人是台大信箱，email/cc/bcc 欄位可以只填學號，會自動補上 @ntu.edu.tw。**")
     )
