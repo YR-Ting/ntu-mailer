@@ -183,11 +183,15 @@ editor_html = f"""
   <button onclick="var u=prompt('輸入圖片網址：');if(u)document.execCommand('insertImage', false, u)" title="插入圖片" type="button">🖼️</button>
   <button onclick="document.execCommand('insertUnorderedList')" title="項目符號" type="button">☰•</button>
   <button onclick="document.execCommand('removeFormat')" title="清除格式" type="button">✕</button>
+  <button onclick="syncNow()" title="立即同步到下方預覽/原始碼" type="button" style="margin-left:auto;background:#e8f0fe;">🔄 立即同步</button>
 </div>
 <div id="editor" contenteditable="true"
      style="min-height:220px;max-height:420px;overflow-y:auto;border:1px solid #ccc;
             border-radius:4px;padding:12px;font-family:sans-serif;font-size:14px;
             background:white;color:black;line-height:1.5;">
+</div>
+<div style="font-size:12px;color:#888;margin-top:4px;">
+  打字停頓約 1 秒會自動同步；若下方預覽或原始碼沒更新，點上方「🔄 立即同步」即可強制更新。
 </div>
 <script>
   const editor = document.getElementById("editor");
@@ -201,26 +205,34 @@ editor_html = f"""
     return null;
   }}
 
-  let syncTimer = null;
-  function syncToStreamlit() {{
-    clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => {{
-      const target = findSyncTextarea();
-      if (!target) return;
-      const setter = Object.getOwnPropertyDescriptor(
-        window.parent.HTMLTextAreaElement.prototype, "value"
-      ).set;
-      setter.call(target, editor.innerHTML);
-      target.dispatchEvent(new Event("input", {{ bubbles: true }}));
-    }}, 600);
+  function doSync() {{
+    const target = findSyncTextarea();
+    if (!target) return;
+    const setter = Object.getOwnPropertyDescriptor(
+      window.parent.HTMLTextAreaElement.prototype, "value"
+    ).set;
+    setter.call(target, editor.innerHTML);
+    target.dispatchEvent(new Event("input", {{ bubbles: true }}));
+    target.dispatchEvent(new Event("change", {{ bubbles: true }}));
   }}
 
-  editor.addEventListener("input", syncToStreamlit);
-  editor.addEventListener("blur", syncToStreamlit);
+  function syncNow() {{
+    clearTimeout(syncTimer);
+    doSync();
+  }}
+
+  let syncTimer = null;
+  function scheduleSyncSoon() {{
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(doSync, 1000);
+  }}
+
+  editor.addEventListener("input", scheduleSyncSoon);
+  editor.addEventListener("blur", doSync);
 </script>
 """
 
-st.components.v1.html(editor_html, height=400, scrolling=True)
+st.components.v1.html(editor_html, height=430, scrolling=True)
 
 # 隱藏欄位：實際儲存內容的地方，用 CSS 藏起來，只留給上方編輯器的 JS 讀寫。
 st.markdown(
@@ -231,11 +243,28 @@ html_content = st.text_area(
     SYNC_LABEL, key="mail_html_content", label_visibility="collapsed"
 )
 
+# 進階原始碼編輯框：跟上方視覺化編輯器共用同一份內容（雙向同步）。
+# 每次重新執行都先把目前內容鏡射進來，確保永遠顯示最新版本；
+# 使用者在這裡修改後，透過 on_change 寫回主內容，視覺化編輯器下次重新整理就會同步更新。
+st.session_state["mail_html_content_advanced"] = html_content
+
+
+def _sync_from_advanced():
+    st.session_state["mail_html_content"] = st.session_state["mail_html_content_advanced"]
+
+
 with st.expander("進階：直接編輯 HTML 原始碼"):
-    st.caption("與上方編輯器共用同一份內容；在這裡修改後，重新整理頁面即可反映到上方視覺化編輯器。")
-    st.code(html_content, language="html")
+    st.caption("與上方視覺化編輯器雙向同步：改這裡，上面也會跟著更新；改上面，這裡也會跟著更新。")
+    st.text_area(
+        "HTML 原始碼",
+        key="mail_html_content_advanced",
+        on_change=_sync_from_advanced,
+        height=200,
+        label_visibility="collapsed",
+    )
 
 with st.expander("📧 預覽套用變數後的樣子（以 $name = 測試 為例）"):
+    st.caption("若上方剛編輯完內容還沒顯示最新結果，請先點視覺化編輯器工具列的「🔄 立即同步」。")
     preview_html = render_content(html_content, {"name": "測試", "email": ""})
     st.components.v1.html(
         f"""
