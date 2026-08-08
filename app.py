@@ -7,6 +7,7 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 
+from mailer.backup import build_eml_zip, build_log_csv
 from mailer.config import (
     EmailAccount,
     GMAIL_SMTP_HOST,
@@ -20,6 +21,8 @@ from mailer.template import render_content
 
 load_dotenv()  # 本機執行時讀取同目錄下的 .env 檔案（若有的話）
 
+TUTORIAL_URL = "https://YR-Ting.github.io/ntu-mailer/tutorial.html"  # 部署 GitHub Pages 後請替換成實際網址
+
 
 def get_secret(key: str, default: str = "") -> str:
     """
@@ -31,6 +34,7 @@ def get_secret(key: str, default: str = "") -> str:
     if key in st.secrets:
         return st.secrets[key]
     return os.getenv(key, default)
+
 
 st.set_page_config(page_title="NTU Mailer", page_icon="📧")
 st.title("📧 NTU Mailer")
@@ -51,6 +55,11 @@ if use_gmail:
     login_label = "Gmail 完整信箱地址"
 else:
     st.caption("台大信箱登入帳號為學號本身，不需加上 @ntu.edu.tw。")
+    st.warning(
+        "⚠️ 台大信箱寄信伺服器僅允許校內網路連線。若你不在校園網路，"
+        "請先連上台大 VPN（[vpn.ntu.edu.tw](https://vpn.ntu.edu.tw)）再寄信，"
+        "否則會出現連線逾時的錯誤。"
+    )
     default_host, default_port = NTU_SMTP_HOST, NTU_SMTP_PORT
     login_label = "台大學號"
 
@@ -81,8 +90,6 @@ with col2:
     smtp_host = st.text_input("SMTP 主機", value=default_host)
     smtp_port = st.number_input("SMTP 連接埠", value=default_port)
 
-bcc_self = st.checkbox("每封信自動 BCC 一份給自己（作為寄件備份）", value=True)
-
 account = EmailAccount(
     smtp_host=smtp_host,
     smtp_port=int(smtp_port),
@@ -90,7 +97,6 @@ account = EmailAccount(
     sender_email=sender_email,
     sender_password=sender_password,
     display_name=display_name,
-    bcc_self=bcc_self,
 )
 
 
@@ -103,7 +109,9 @@ with col_upload:
     st.caption(
         "CSV 需包含 name、email 欄位；cc、bcc 為選填（同一列多筆信箱請用空格分隔）。"
         "其餘欄位可在內文中用 $欄位名 替換，例如 $name。"
+        + ("" if use_gmail else " **若收件人是台大信箱，email/cc/bcc 欄位可以只填學號，會自動補上 @ntu.edu.tw。**")
     )
+    st.markdown(f"📘 [查看詳細教學（附圖文說明）]({TUTORIAL_URL})")
 with col_sample:
     st.write("")  # 對齊用的空行
     st.write("")
@@ -120,7 +128,9 @@ with col_sample:
 recipients_df = None
 if csv_file is not None:
     try:
-        recipients_df = load_recipients(csv_file)
+        # 只有非 Gmail（即台大信箱）模式才自動補齊學號網域，
+        # 因為 Gmail 收件人不一定都是台大信箱，不應強制補上 @ntu.edu.tw
+        recipients_df = load_recipients(csv_file, use_ntu_shorthand=not use_gmail)
         st.success(f"成功讀取 {len(recipients_df)} 筆收件人")
         st.dataframe(recipients_df, use_container_width=True)
     except ValueError as e:
@@ -215,5 +225,22 @@ if st.button("🚀 正式寄送", disabled=not confirm):
         fail_count = len(results) - success_count
         st.info(f"寄送完成：成功 {success_count} 封，失敗 {fail_count} 封")
 
-        if account.bcc_self:
-            st.caption(f"每封信已自動副送備份至 {account.sender_email}，可到該信箱查看寄件記錄。")
+        st.subheader("📦 寄件備份下載")
+        st.caption("不再透過 BCC 寄回信箱，改為以下檔案供留存查閱。")
+
+        col_csv, col_eml = st.columns(2)
+        with col_csv:
+            st.download_button(
+                "⬇️ 下載寄送記錄（CSV）",
+                data=build_log_csv(results),
+                file_name="send_log.csv",
+                mime="text/csv",
+            )
+        with col_eml:
+            st.download_button(
+                "⬇️ 下載完整信件備份（ZIP）",
+                data=build_eml_zip(results),
+                file_name="sent_emails_backup.zip",
+                mime="application/zip",
+                help="包含每封信的完整原始內容（.eml 檔），可用 Outlook / Thunderbird 等信箱軟體開啟查看。",
+            )

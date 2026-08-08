@@ -13,7 +13,6 @@ class EmailAccount:
     sender_email: str       # 完整寄件信箱地址，envelope sender 必須是完整格式，例如 B12345678@ntu.edu.tw
     sender_password: str    # 登入密碼（Gmail 請用「應用程式密碼」，不要用一般登入密碼）
     display_name: str = ""  # 收件人看到的寄件者名稱，留空則顯示原始信箱地址
-    bcc_self: bool = False  # 是否在每封信自動 BCC 一份給自己，作為寄件備份
 
 
 # 兩種常見服務的預設 SMTP 設定，方便介面切換時自動帶入

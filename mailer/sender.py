@@ -1,9 +1,12 @@
 """
 實際的 SMTP 寄信邏輯：組信件（含 CC/BCC、附件）、逐封寄送、回傳結果。
+寄送記錄不透過 BCC 寄回自己信箱，而是回傳完整資料，交由呼叫端（app.py）
+輸出成本機檔案（.eml 備份 + CSV 記錄），避免每寄一封就多耗用一次信箱流量與時間。
 """
 import smtplib
 import ssl
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -19,6 +22,9 @@ class SendResult:
     email: str
     success: bool
     error: str = ""
+    subject: str = ""
+    sent_at: str = ""
+    raw_message: bytes = field(default=b"", repr=False)  # 完整 .eml 內容，供備份輸出
 
 
 def _build_message(
@@ -36,6 +42,7 @@ def _build_message(
     if cc_list:
         msg["Cc"] = ", ".join(cc_list)
     msg["Subject"] = subject
+    msg["Date"] = datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z")
 
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
@@ -45,6 +52,7 @@ def _build_message(
             filename, data = att
         else:
             filename, data = att.name, att.read()
+            att.seek(0)  # 重置讀取位置，讓下一封信也能重新讀取同一個附件
         part = MIMEApplication(data, Name=filename)
         part["Content-Disposition"] = f'attachment; filename="{filename}"'
         msg.attach(part)
@@ -76,13 +84,10 @@ def send_one(
     """
     cc_list = split_addresses(cc)
     bcc_list = split_addresses(bcc)
-
-    if account.bcc_self and account.sender_email not in bcc_list:
-        bcc_list = bcc_list + [account.sender_email]
-
     all_recipients = [to_email] + cc_list + bcc_list
 
     msg = _build_message(account, to_email, cc_list, subject, html_content, attachments)
+    sent_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     owns_connection = smtp_conn is None
     try:
@@ -92,10 +97,23 @@ def send_one(
         # envelope sender 必須是完整格式（B12345678@ntu.edu.tw），不能只給學號，
         # 否則伺服器會回 504 5.5.2 need fully-qualified address
         smtp_conn.sendmail(account.sender_email, all_recipients, msg.as_string())
-        return SendResult(email=to_email, success=True)
+        return SendResult(
+            email=to_email,
+            success=True,
+            subject=subject,
+            sent_at=sent_at,
+            raw_message=msg.as_bytes(),
+        )
 
     except Exception as e:
-        return SendResult(email=to_email, success=False, error=str(e))
+        return SendResult(
+            email=to_email,
+            success=False,
+            error=str(e),
+            subject=subject,
+            sent_at=sent_at,
+            raw_message=msg.as_bytes(),
+        )
 
     finally:
         if owns_connection and smtp_conn is not None:
@@ -116,6 +134,7 @@ def send_batch(
     """
     批次寄送。共用同一條 SMTP 連線以加快速度。
     progress_callback(index, total, result)：每寄完一封就會呼叫一次，方便介面更新進度條。
+    回傳的每個 SendResult 都帶有完整信件內容（raw_message），供輸出備份使用。
     """
     results: list[SendResult] = []
     total = len(recipients_df)
