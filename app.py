@@ -109,7 +109,7 @@ with col_upload:
     st.caption(
         "CSV 需包含 email 欄位（必填）；name、cc、bcc 為選填（cc/bcc 多筆信箱請用空格分隔）。"
         "其餘欄位可在內文中用 $欄位名 替換，例如 $name。"
-        + ("" if use_gmail else " **若收件人是台大信箱，email/cc/bcc 欄位可以只填學號，會自動補上 @ntu.edu.tw。**")
+        " **若收件人是台大信箱，email/cc/bcc 欄位可以只填學號，會自動補上 @ntu.edu.tw（無論你用台大信箱或 Gmail 寄送皆適用）。**"
     )
     st.markdown(f"📘 [查看詳細教學（附圖文說明）]({TUTORIAL_URL})")
 with col_sample:
@@ -128,9 +128,9 @@ with col_sample:
 recipients_df = None
 if csv_file is not None:
     try:
-        # 只有非 Gmail（即台大信箱）模式才自動補齊學號網域，
-        # 因為 Gmail 收件人不一定都是台大信箱，不應強制補上 @ntu.edu.tw
-        recipients_df = load_recipients(csv_file, use_ntu_shorthand=not use_gmail)
+        # 學號簡寫規則看的是「收件人」是不是台大人，跟寄件帳號用台大信箱或 Gmail 無關，
+        # 所以一律套用；已包含 @ 的地址不受影響，維持原樣。
+        recipients_df = load_recipients(csv_file, use_ntu_shorthand=True)
         st.success(f"成功讀取 {len(recipients_df)} 筆收件人")
         st.dataframe(recipients_df, use_container_width=True)
     except ValueError as e:
