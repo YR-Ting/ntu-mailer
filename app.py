@@ -225,22 +225,29 @@ if st.button("🚀 正式寄送", disabled=not confirm):
         fail_count = len(results) - success_count
         st.info(f"寄送完成：成功 {success_count} 封，失敗 {fail_count} 封")
 
-        st.subheader("📦 寄件備份下載")
-        st.caption("不再透過 BCC 寄回信箱，改為以下檔案供留存查閱。")
+        # 存進 session_state：因為下方的下載按鈕本身也會觸發頁面重新執行，
+        # 若不保存，results 這個區域變數會在下一次重新執行時消失，備份區塊就會跟著不見。
+        st.session_state["last_send_results"] = results
 
-        col_csv, col_eml = st.columns(2)
-        with col_csv:
-            st.download_button(
-                "⬇️ 下載寄送記錄（CSV）",
-                data=build_log_csv(results),
-                file_name="send_log.csv",
-                mime="text/csv",
-            )
-        with col_eml:
-            st.download_button(
-                "⬇️ 下載完整信件備份（ZIP）",
-                data=build_eml_zip(results),
-                file_name="sent_emails_backup.zip",
-                mime="application/zip",
-                help="包含每封信的完整原始內容（.eml 檔），可用 Outlook / Thunderbird 等信箱軟體開啟查看。",
-            )
+if "last_send_results" in st.session_state:
+    results = st.session_state["last_send_results"]
+
+    st.subheader("📦 寄件備份下載")
+    st.caption("不再透過 BCC 寄回信箱，改為以下檔案供留存查閱。")
+
+    col_csv, col_eml = st.columns(2)
+    with col_csv:
+        st.download_button(
+            "⬇️ 下載寄送記錄（CSV）",
+            data=build_log_csv(results),
+            file_name="send_log.csv",
+            mime="text/csv",
+        )
+    with col_eml:
+        st.download_button(
+            "⬇️ 下載完整信件備份（ZIP）",
+            data=build_eml_zip(results),
+            file_name="sent_emails_backup.zip",
+            mime="application/zip",
+            help="包含每封信的完整原始內容（.eml 檔），可用 Outlook / Thunderbird 等信箱軟體開啟查看。",
+        )
