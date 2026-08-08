@@ -138,14 +138,48 @@ if csv_file is not None:
 
 
 # ---------- 3. 信件內容 ----------
+# ---------- 3. 信件內容 ----------
 st.header("3. 信件內容")
 
 subject = st.text_input("信件主旨", value="")
+
+DEFAULT_CONTENT = "<p>親愛的 $name 您好，</p><p>...</p>"
+
+st.caption("內文可用 $name 等變數，會依 CSV 每一列自動替換成對應的值。")
+
+if "mail_html_content" not in st.session_state:
+    st.session_state["mail_html_content"] = DEFAULT_CONTENT
+
+# 格式工具列：點下去會把對應的 HTML 標籤插入到內文最後，
+# 插入後把標籤裡的「文字」替換成你要的內容即可。
+# 這個做法不依賴任何第三方視覺化編輯器套件，避免套件相容性問題導致功能失效。
+st.write("**格式工具列**（點擊後會把標籤插入內文最後，把裡面的「文字」換成你要的內容）")
+
+FORMAT_SNIPPETS = {
+    "𝐁 粗體": "<b>文字</b>",
+    "𝐼 斜體": "<i>文字</i>",
+    "U̲ 底線": "<u>文字</u>",
+    "S̶ 刪除線": "<s>文字</s>",
+    "🎨 顏色": '<span style="color:#e63946;">文字</span>',
+    "🔤 字級": '<span style="font-size:20px;">文字</span>',
+    "↔️ 置中": '<p style="text-align:center;">文字</p>',
+    "🔗 超連結": '<a href="https://example.com">連結文字</a>',
+    "🖼️ 插入圖片": '<img src="圖片網址" alt="圖片說明" style="max-width:100%;">',
+}
+
+toolbar_cols = st.columns(len(FORMAT_SNIPPETS))
+for col, (label, snippet) in zip(toolbar_cols, FORMAT_SNIPPETS.items()):
+    if col.button(label, use_container_width=True):
+        st.session_state["mail_html_content"] += snippet
+
 html_content = st.text_area(
     "內文（HTML，可用 $name 等變數）",
     height=250,
-    value="<p>親愛的 $name 您好，</p><p>...</p>",
+    key="mail_html_content",
 )
+
+with st.expander("預覽信件內容"):
+    st.markdown(html_content, unsafe_allow_html=True)
 
 uploaded_attachments = st.file_uploader(
     "附件（可選，可多選）", accept_multiple_files=True
