@@ -2,6 +2,7 @@
 NTU Mailer - 網頁介面
 只負責畫面與使用者互動，實際寄信邏輯都在 mailer/ 套件底下。
 """
+import json
 import os
 
 import streamlit as st
@@ -138,48 +139,106 @@ if csv_file is not None:
 
 
 # ---------- 3. 信件內容 ----------
-# ---------- 3. 信件內容 ----------
 st.header("3. 信件內容")
 
 subject = st.text_input("信件主旨", value="")
 
-DEFAULT_CONTENT = "<p>親愛的 $name 您好，</p><p>...</p>"
+DEFAULT_CONTENT = "親愛的 $name 您好，<br><br>"
 
-st.caption("內文可用 $name 等變數，會依 CSV 每一列自動替換成對應的值。")
+st.caption(
+    "直接打字、按 Enter 換行，跟 Gmail 撰寫信件一樣。"
+    "可用 $name 等變數，會依 CSV 每一列自動替換成對應的值。"
+)
 
 if "mail_html_content" not in st.session_state:
     st.session_state["mail_html_content"] = DEFAULT_CONTENT
 
-# 格式工具列：點下去會把對應的 HTML 標籤插入到內文最後，
-# 插入後把標籤裡的「文字」替換成你要的內容即可。
-# 這個做法不依賴任何第三方視覺化編輯器套件，避免套件相容性問題導致功能失效。
-st.write("**格式工具列**（點擊後會把標籤插入內文最後，把裡面的「文字」換成你要的內容）")
+# 這個隱藏欄位是編輯器與系統之間真正儲存內容的地方，使用者不會直接看到它，
+# 只是透過下方的 JS 把 contenteditable 編輯區的內容同步進來。
+SYNC_LABEL = "⧉mail_content_sync⧉"
 
-FORMAT_SNIPPETS = {
-    "𝐁 粗體": "<b>文字</b>",
-    "𝐼 斜體": "<i>文字</i>",
-    "U̲ 底線": "<u>文字</u>",
-    "S̶ 刪除線": "<s>文字</s>",
-    "🎨 顏色": '<span style="color:#e63946;">文字</span>',
-    "🔤 字級": '<span style="font-size:20px;">文字</span>',
-    "↔️ 置中": '<p style="text-align:center;">文字</p>',
-    "🔗 超連結": '<a href="https://example.com">連結文字</a>',
-    "🖼️ 插入圖片": '<img src="圖片網址" alt="圖片說明" style="max-width:100%;">',
-}
+current_content_json = json.dumps(st.session_state["mail_html_content"])
 
-toolbar_cols = st.columns(len(FORMAT_SNIPPETS))
-for col, (label, snippet) in zip(toolbar_cols, FORMAT_SNIPPETS.items()):
-    if col.button(label, use_container_width=True):
-        st.session_state["mail_html_content"] += snippet
+editor_html = f"""
+<div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:4px;font-family:sans-serif;">
+  <button onclick="document.execCommand('bold')" title="粗體" type="button" style="font-weight:bold;">B</button>
+  <button onclick="document.execCommand('italic')" title="斜體" type="button" style="font-style:italic;">I</button>
+  <button onclick="document.execCommand('underline')" title="底線" type="button" style="text-decoration:underline;">U</button>
+  <button onclick="document.execCommand('strikeThrough')" title="刪除線" type="button" style="text-decoration:line-through;">S</button>
+  <input type="color" title="文字顏色" onchange="document.execCommand('foreColor', false, this.value)" style="width:30px;height:30px;padding:0;border:1px solid #ccc;">
+  <select onchange="if(this.value) document.execCommand('fontSize', false, this.value); this.selectedIndex=0;" title="字級" style="height:30px;">
+    <option value="">字級</option>
+    <option value="2">小</option>
+    <option value="3">中</option>
+    <option value="5">大</option>
+    <option value="7">特大</option>
+  </select>
+  <button onclick="document.execCommand('justifyLeft')" title="靠左對齊" type="button">⯇</button>
+  <button onclick="document.execCommand('justifyCenter')" title="置中" type="button">☰</button>
+  <button onclick="document.execCommand('justifyRight')" title="靠右對齊" type="button">⯈</button>
+  <button onclick="var u=prompt('輸入超連結網址：','https://');if(u)document.execCommand('createLink', false, u)" title="插入超連結" type="button">🔗</button>
+  <button onclick="var u=prompt('輸入圖片網址：');if(u)document.execCommand('insertImage', false, u)" title="插入圖片" type="button">🖼️</button>
+  <button onclick="document.execCommand('insertUnorderedList')" title="項目符號" type="button">☰•</button>
+  <button onclick="document.execCommand('removeFormat')" title="清除格式" type="button">✕</button>
+</div>
+<div id="editor" contenteditable="true"
+     style="min-height:220px;max-height:420px;overflow-y:auto;border:1px solid #ccc;
+            border-radius:4px;padding:12px;font-family:sans-serif;font-size:14px;
+            background:white;color:black;line-height:1.5;">
+</div>
+<script>
+  const editor = document.getElementById("editor");
+  editor.innerHTML = {current_content_json};
 
+  function findSyncTextarea() {{
+    const areas = window.parent.document.querySelectorAll("textarea");
+    for (const el of areas) {{
+      if (el.getAttribute("aria-label") === "{SYNC_LABEL}") return el;
+    }}
+    return null;
+  }}
+
+  let syncTimer = null;
+  function syncToStreamlit() {{
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {{
+      const target = findSyncTextarea();
+      if (!target) return;
+      const setter = Object.getOwnPropertyDescriptor(
+        window.parent.HTMLTextAreaElement.prototype, "value"
+      ).set;
+      setter.call(target, editor.innerHTML);
+      target.dispatchEvent(new Event("input", {{ bubbles: true }}));
+    }}, 600);
+  }}
+
+  editor.addEventListener("input", syncToStreamlit);
+  editor.addEventListener("blur", syncToStreamlit);
+</script>
+"""
+
+st.components.v1.html(editor_html, height=400, scrolling=True)
+
+# 隱藏欄位：實際儲存內容的地方，用 CSS 藏起來，只留給上方編輯器的 JS 讀寫。
+st.markdown(
+    f'<style>textarea[aria-label="{SYNC_LABEL}"] {{ display: none; }}</style>',
+    unsafe_allow_html=True,
+)
 html_content = st.text_area(
-    "內文（HTML，可用 $name 等變數）",
-    height=250,
-    key="mail_html_content",
+    SYNC_LABEL, key="mail_html_content", label_visibility="collapsed"
 )
 
-with st.expander("預覽信件內容"):
-    st.markdown(html_content, unsafe_allow_html=True)
+with st.expander("進階：直接編輯 HTML 原始碼"):
+    st.caption("與上方編輯器共用同一份內容；在這裡修改後，重新整理頁面即可反映到上方視覺化編輯器。")
+    st.code(html_content, language="html")
+
+with st.expander("📧 預覽套用變數後的樣子（以 $name = 測試 為例）"):
+    preview_html = render_content(html_content, {"name": "測試", "email": ""})
+    st.components.v1.html(
+        f'<div style="font-family:sans-serif;font-size:14px;">{preview_html}</div>',
+        height=250,
+        scrolling=True,
+    )
 
 uploaded_attachments = st.file_uploader(
     "附件（可選，可多選）", accept_multiple_files=True
