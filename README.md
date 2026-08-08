@@ -60,3 +60,5 @@ ntu_mailer_project/
 - `.env` 已加入 `.gitignore`，分享專案給其他系學會成員時不會外洩密碼
 - 本工具是本機執行（localhost），密碼不會經過任何外部伺服器
 - 正式寄送前務必先用「測試寄送」確認格式與內文替換正確
+
+CONTACT B14601012@ntu.edu.tw
