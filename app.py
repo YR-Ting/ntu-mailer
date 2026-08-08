@@ -160,6 +160,9 @@ SYNC_LABEL = "⧉mail_content_sync⧉"
 current_content_json = json.dumps(st.session_state["mail_html_content"])
 
 editor_html = f"""
+<style>
+  html, body {{ background:#ffffff; margin:0; padding:0; }}
+</style>
 <div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:4px;font-family:sans-serif;">
   <button onclick="document.execCommand('bold')" title="粗體" type="button" style="font-weight:bold;">B</button>
   <button onclick="document.execCommand('italic')" title="斜體" type="button" style="font-style:italic;">I</button>
@@ -235,7 +238,21 @@ with st.expander("進階：直接編輯 HTML 原始碼"):
 with st.expander("📧 預覽套用變數後的樣子（以 $name = 測試 為例）"):
     preview_html = render_content(html_content, {"name": "測試", "email": ""})
     st.components.v1.html(
-        f'<div style="font-family:sans-serif;font-size:14px;">{preview_html}</div>',
+        f"""
+        <html>
+        <head>
+        <style>
+            html, body {{ background:#ffffff; margin:0; padding:0; }}
+        </style>
+        </head>
+        <body>
+            <div style="font-family:sans-serif;font-size:14px;color:#000000;
+                        background:#ffffff;padding:12px;">
+                {preview_html}
+            </div>
+        </body>
+        </html>
+        """,
         height=250,
         scrolling=True,
     )
