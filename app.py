@@ -164,26 +164,30 @@ editor_html = f"""
   html, body {{ background:#ffffff; margin:0; padding:0; }}
 </style>
 <div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:4px;font-family:sans-serif;">
-  <button onclick="document.execCommand('bold')" title="粗體" type="button" style="font-weight:bold;">B</button>
-  <button onclick="document.execCommand('italic')" title="斜體" type="button" style="font-style:italic;">I</button>
-  <button onclick="document.execCommand('underline')" title="底線" type="button" style="text-decoration:underline;">U</button>
-  <button onclick="document.execCommand('strikeThrough')" title="刪除線" type="button" style="text-decoration:line-through;">S</button>
-  <input type="color" title="文字顏色" onchange="document.execCommand('foreColor', false, this.value)" style="width:30px;height:30px;padding:0;border:1px solid #ccc;">
-  <select onchange="if(this.value) document.execCommand('fontSize', false, this.value); this.selectedIndex=0;" title="字級" style="height:30px;">
+  <button onmousedown="event.preventDefault()" onclick="applyCmd('bold')" title="粗體" type="button" style="font-weight:bold;">B</button>
+  <button onmousedown="event.preventDefault()" onclick="applyCmd('italic')" title="斜體" type="button" style="font-style:italic;">I</button>
+  <button onmousedown="event.preventDefault()" onclick="applyCmd('underline')" title="底線" type="button" style="text-decoration:underline;">U</button>
+  <button onmousedown="event.preventDefault()" onclick="applyCmd('strikeThrough')" title="刪除線" type="button" style="text-decoration:line-through;">S</button>
+  <input type="color" title="文字顏色" onmousedown="saveSelection()"
+         onchange="restoreSelection(); document.execCommand('foreColor', false, this.value); doSync();"
+         style="width:30px;height:30px;padding:0;border:1px solid #ccc;">
+  <select onmousedown="saveSelection()"
+          onchange="if(this.value){{restoreSelection(); document.execCommand('fontSize', false, this.value); doSync();}} this.selectedIndex=0;"
+          title="字級" style="height:30px;">
     <option value="">字級</option>
     <option value="2">小</option>
     <option value="3">中</option>
     <option value="5">大</option>
     <option value="7">特大</option>
   </select>
-  <button onclick="document.execCommand('justifyLeft')" title="靠左對齊" type="button">⯇</button>
-  <button onclick="document.execCommand('justifyCenter')" title="置中" type="button">☰</button>
-  <button onclick="document.execCommand('justifyRight')" title="靠右對齊" type="button">⯈</button>
-  <button onclick="var u=prompt('輸入超連結網址：','https://');if(u)document.execCommand('createLink', false, u)" title="插入超連結" type="button">🔗</button>
-  <button onclick="var u=prompt('輸入圖片網址：');if(u)document.execCommand('insertImage', false, u)" title="插入圖片" type="button">🖼️</button>
-  <button onclick="document.execCommand('insertUnorderedList')" title="項目符號" type="button">☰•</button>
-  <button onclick="document.execCommand('removeFormat')" title="清除格式" type="button">✕</button>
-  <button onclick="syncNow()" title="立即同步到下方預覽/原始碼" type="button" style="margin-left:auto;background:#e8f0fe;">🔄 立即同步</button>
+  <button onmousedown="event.preventDefault()" onclick="applyCmd('justifyLeft')" title="靠左對齊" type="button">⯇</button>
+  <button onmousedown="event.preventDefault()" onclick="applyCmd('justifyCenter')" title="置中" type="button">☰</button>
+  <button onmousedown="event.preventDefault()" onclick="applyCmd('justifyRight')" title="靠右對齊" type="button">⯈</button>
+  <button onmousedown="saveSelection()" onclick="var u=prompt('輸入超連結網址：','https://'); if(u){{restoreSelection(); document.execCommand('createLink', false, u); doSync();}}" title="插入超連結" type="button">🔗</button>
+  <button onmousedown="saveSelection()" onclick="var u=prompt('輸入圖片網址：'); if(u){{restoreSelection(); document.execCommand('insertImage', false, u); doSync();}}" title="插入圖片" type="button">🖼️</button>
+  <button onmousedown="event.preventDefault()" onclick="applyCmd('insertUnorderedList')" title="項目符號" type="button">☰•</button>
+  <button onmousedown="event.preventDefault()" onclick="applyCmd('removeFormat')" title="清除格式" type="button">✕</button>
+  <button onmousedown="event.preventDefault()" onclick="syncNow()" title="立即同步到下方預覽/原始碼" type="button" style="margin-left:auto;background:#e8f0fe;">🔄 立即同步</button>
 </div>
 <div id="editor" contenteditable="true"
      style="min-height:220px;max-height:420px;overflow-y:auto;border:1px solid #ccc;
@@ -191,11 +195,34 @@ editor_html = f"""
             background:white;color:black;line-height:1.5;">
 </div>
 <div style="font-size:12px;color:#888;margin-top:4px;">
-  打字停頓約 1 秒會自動同步；若下方預覽或原始碼沒更新，點上方「🔄 立即同步」即可強制更新。
+  格式工具列的每個動作都會自動同步；若下方預覽或原始碼仍未更新，點上方「🔄 立即同步」即可強制更新。
 </div>
 <script>
   const editor = document.getElementById("editor");
   editor.innerHTML = {current_content_json};
+  let savedRange = null;
+
+  function saveSelection() {{
+    const sel = window.getSelection();
+    if (sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {{
+      savedRange = sel.getRangeAt(0).cloneRange();
+    }}
+  }}
+
+  function restoreSelection() {{
+    if (savedRange) {{
+      editor.focus();
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+    }}
+  }}
+
+  function applyCmd(command) {{
+    editor.focus();
+    document.execCommand(command);
+    doSync();
+  }}
 
   function findSyncTextarea() {{
     const areas = window.parent.document.querySelectorAll("textarea");
@@ -229,6 +256,8 @@ editor_html = f"""
 
   editor.addEventListener("input", scheduleSyncSoon);
   editor.addEventListener("blur", doSync);
+  editor.addEventListener("mouseup", saveSelection);
+  editor.addEventListener("keyup", saveSelection);
 </script>
 """
 
