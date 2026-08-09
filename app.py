@@ -238,9 +238,14 @@ editor_html = f"""
     const setter = Object.getOwnPropertyDescriptor(
       window.parent.HTMLTextAreaElement.prototype, "value"
     ).set;
+    // Streamlit 的文字框元件要等到完整經歷「聚焦 → 輸入 → 失焦」才會把新內容送回後端，
+    // 只觸發 input/change 事件在某些情況下只會更新畫面上的顯示，不會真正提交給伺服器。
+    // 這裡明確模擬完整循環，確保後端拿到的一定是最新內容。
+    target.focus();
     setter.call(target, editor.innerHTML);
     target.dispatchEvent(new Event("input", {{ bubbles: true }}));
     target.dispatchEvent(new Event("change", {{ bubbles: true }}));
+    target.blur();
   }}
 
   function syncNow() {{
@@ -263,9 +268,22 @@ editor_html = f"""
 
 st.components.v1.html(editor_html, height=430, scrolling=True)
 
-# 隱藏欄位：實際儲存內容的地方，用 CSS 藏起來，只留給上方編輯器的 JS 讀寫。
+# 隱藏欄位：實際儲存內容的地方。故意不用 display:none，
+# 因為瀏覽器不允許聚焦（focus）display:none 的元素，會導致上方編輯器的同步機制失效。
+# 改用「移出版面、縮到極小、完全透明」的方式，讓它保持可被 JS 聚焦操作，但使用者看不到也點不到。
 st.markdown(
-    f'<style>textarea[aria-label="{SYNC_LABEL}"] {{ display: none; }}</style>',
+    f"""
+    <style>
+    textarea[aria-label="{SYNC_LABEL}"] {{
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        opacity: 0 !important;
+        overflow: hidden !important;
+        pointer-events: none !important;
+    }}
+    </style>
+    """,
     unsafe_allow_html=True,
 )
 html_content = st.text_area(
