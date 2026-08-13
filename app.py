@@ -195,7 +195,7 @@ editor_html = f"""
             background:white;color:black;line-height:1.5;">
 </div>
 <div style="font-size:12px;color:#888;margin-top:4px;">
-  格式工具列的每個動作都會自動同步；若下方預覽或原始碼仍未更新，點上方「🔄 立即同步」即可強制更新。
+  可以連續打字不會被打斷；點格式按鈕、點到編輯區外、或按「🔄 立即同步」時才會更新下方預覽與原始碼。
 </div>
 <script>
   const editor = document.getElementById("editor");
@@ -249,17 +249,9 @@ editor_html = f"""
   }}
 
   function syncNow() {{
-    clearTimeout(syncTimer);
     doSync();
   }}
 
-  let syncTimer = null;
-  function scheduleSyncSoon() {{
-    clearTimeout(syncTimer);
-    syncTimer = setTimeout(doSync, 1000);
-  }}
-
-  editor.addEventListener("input", scheduleSyncSoon);
   editor.addEventListener("blur", doSync);
   editor.addEventListener("mouseup", saveSelection);
   editor.addEventListener("keyup", saveSelection);
