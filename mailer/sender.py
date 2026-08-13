@@ -44,7 +44,13 @@ def _build_message(
     msg["Subject"] = subject
     msg["Date"] = datetime.now().strftime("%a, %d %b %Y %H:%M:%S %z")
 
-    msg.attach(MIMEText(html_content, "html", "utf-8"))
+    # 包一層行距樣式，確保收件人看到的排版跟編輯器裡打字時看到的樣子一致
+    # （不特別設定的話，不同信箱軟體的預設行距不一，換行間距可能忽寬忽窄）
+    wrapped_html = (
+        '<div style="font-family:sans-serif;font-size:14px;line-height:1.25;">'
+        f"{html_content}</div>"
+    )
+    msg.attach(MIMEText(wrapped_html, "html", "utf-8"))
 
     for att in attachments or []:
         # att 可以是 (filename, bytes) tuple，或有 .name / .read() 的檔案物件（如 Streamlit UploadedFile）

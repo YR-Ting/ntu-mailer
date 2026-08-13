@@ -192,7 +192,7 @@ editor_html = f"""
 <div id="editor" contenteditable="true"
      style="min-height:220px;max-height:420px;overflow-y:auto;border:1px solid #ccc;
             border-radius:4px;padding:12px;font-family:sans-serif;font-size:14px;
-            background:white;color:black;line-height:1.5;">
+            background:white;color:black;line-height:1.25;">
 </div>
 <div style="font-size:12px;color:#888;margin-top:4px;">
   可以連續打字不會被打斷；點格式按鈕、點到編輯區外、或按「🔄 立即同步」時才會更新下方預覽與原始碼。
@@ -315,7 +315,7 @@ with st.expander("📧 預覽套用變數後的樣子（以 $name = 測試 為�
         </head>
         <body>
             <div style="font-family:sans-serif;font-size:14px;color:#000000;
-                        background:#ffffff;padding:12px;">
+                        background:#ffffff;padding:12px;line-height:1.25;">
                 {preview_html}
             </div>
         </body>
